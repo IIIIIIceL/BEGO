@@ -1,6 +1,7 @@
 package com.bego.backend.todo.mapper;
 
 import com.bego.backend.todo.entity.TodoTagEntity;
+import com.bego.backend.todo.vo.TodoTagResponse;
 import java.util.List;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
@@ -32,6 +33,25 @@ public interface TodoTagMapper {
             ORDER BY created_at ASC
             """)
     List<Long> findTagIdsByTodoIdAndUserId(@Param("todoId") Long todoId, @Param("userId") Long userId);
+
+    @Select("""
+            SELECT
+                tg.id AS id,
+                tg.name AS name,
+                tg.color AS color
+            FROM todo_tags tt
+            JOIN tags tg
+              ON tg.id = tt.tag_id
+             AND tg.user_id = tt.user_id
+             AND tg.deleted_at IS NULL
+            WHERE tt.todo_id = #{todoId}
+              AND tt.user_id = #{userId}
+            ORDER BY tg.sort_order ASC, tg.created_at ASC
+            """)
+    List<TodoTagResponse> findTagResponsesByTodoIdAndUserId(
+            @Param("todoId") Long todoId,
+            @Param("userId") Long userId
+    );
 
     @Delete("""
             DELETE FROM todo_tags
