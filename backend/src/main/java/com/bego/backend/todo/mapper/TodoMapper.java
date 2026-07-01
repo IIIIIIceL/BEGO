@@ -1,0 +1,122 @@
+package com.bego.backend.todo.mapper;
+
+import com.bego.backend.todo.entity.TodoEntity;
+import java.time.Instant;
+import java.util.List;
+import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Options;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
+
+@Mapper
+public interface TodoMapper {
+
+    @Insert("""
+            INSERT INTO todos (
+                user_id,
+                title,
+                description,
+                status,
+                priority,
+                client_temp_id,
+                sync_status,
+                last_synced_at,
+                due_at,
+                reminder_at,
+                completed_at,
+                sort_order
+            ) VALUES (
+                #{userId},
+                #{title},
+                #{description},
+                #{status},
+                #{priority},
+                #{clientTempId},
+                #{syncStatus},
+                #{lastSyncedAt},
+                #{dueAt},
+                #{reminderAt},
+                #{completedAt},
+                #{sortOrder}
+            )
+            """)
+    @Options(useGeneratedKeys = true, keyProperty = "id")
+    int insert(TodoEntity todo);
+
+    @Select("""
+            SELECT *
+            FROM todos
+            WHERE id = #{id}
+              AND user_id = #{userId}
+              AND deleted_at IS NULL
+            """)
+    TodoEntity findActiveByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
+
+    @Select("""
+            SELECT *
+            FROM todos
+            WHERE user_id = #{userId}
+              AND client_temp_id = #{clientTempId}
+              AND deleted_at IS NULL
+            """)
+    TodoEntity findActiveByUserIdAndClientTempId(
+            @Param("userId") Long userId,
+            @Param("clientTempId") String clientTempId
+    );
+
+    @Select("""
+            SELECT *
+            FROM todos
+            WHERE user_id = #{userId}
+              AND deleted_at IS NULL
+            ORDER BY
+              CASE WHEN status = 'TODO' THEN 0 ELSE 1 END,
+              CASE WHEN due_at IS NULL THEN 1 ELSE 0 END,
+              due_at ASC,
+              updated_at DESC
+            LIMIT #{limit}
+            OFFSET #{offset}
+            """)
+    List<TodoEntity> findActivePageByUserId(
+            @Param("userId") Long userId,
+            @Param("limit") int limit,
+            @Param("offset") int offset
+    );
+
+    @Update("""
+            UPDATE todos
+            SET status = #{status},
+                completed_at = #{completedAt},
+                updated_at = CURRENT_TIMESTAMP(3)
+            WHERE id = #{id}
+              AND user_id = #{userId}
+              AND deleted_at IS NULL
+            """)
+    int updateStatus(
+            @Param("id") Long id,
+            @Param("userId") Long userId,
+            @Param("status") String status,
+            @Param("completedAt") Instant completedAt
+    );
+
+    @Update("""
+            UPDATE todos
+            SET deleted_at = CURRENT_TIMESTAMP(3),
+                updated_at = CURRENT_TIMESTAMP(3)
+            WHERE id = #{id}
+              AND user_id = #{userId}
+              AND deleted_at IS NULL
+            """)
+    int softDeleteByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
+
+    @Update("""
+            UPDATE todos
+            SET deleted_at = CURRENT_TIMESTAMP(3),
+                updated_at = CURRENT_TIMESTAMP(3)
+            WHERE user_id = #{userId}
+              AND deleted_at IS NULL
+            """)
+    int softDeleteAllByUserId(@Param("userId") Long userId);
+}

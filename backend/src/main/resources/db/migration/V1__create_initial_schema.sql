@@ -1,0 +1,103 @@
+CREATE TABLE users (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    email VARCHAR(255) NOT NULL,
+    normalized_email VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    display_name VARCHAR(80) NOT NULL,
+    avatar_url VARCHAR(1000) NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    last_login_at DATETIME(3) NULL,
+    deletion_requested_at DATETIME(3) NULL,
+    anonymized_at DATETIME(3) NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    deleted_at DATETIME(3) NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_users_normalized_email (normalized_email),
+    KEY idx_users_deleted_at (deleted_at),
+    CONSTRAINT chk_users_status CHECK (status IN ('ACTIVE', 'DISABLED', 'DELETED'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE todos (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id BIGINT UNSIGNED NOT NULL,
+    title VARCHAR(120) NOT NULL,
+    description TEXT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'TODO',
+    priority VARCHAR(20) NOT NULL DEFAULT 'MEDIUM',
+    client_temp_id VARCHAR(64) NULL,
+    sync_status VARCHAR(20) NOT NULL DEFAULT 'SYNCED',
+    last_synced_at DATETIME(3) NULL,
+    due_at DATETIME(3) NULL,
+    reminder_at DATETIME(3) NULL,
+    completed_at DATETIME(3) NULL,
+    sort_order BIGINT NOT NULL DEFAULT 0,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    deleted_at DATETIME(3) NULL,
+    PRIMARY KEY (id),
+    KEY idx_todos_user_status_due (user_id, deleted_at, status, due_at),
+    KEY idx_todos_user_updated (user_id, deleted_at, updated_at),
+    KEY idx_todos_user_priority (user_id, deleted_at, priority),
+    KEY idx_todos_user_created (user_id, deleted_at, created_at),
+    KEY idx_todos_reminder (reminder_at, status, deleted_at),
+    UNIQUE KEY uk_todos_user_client_temp (user_id, client_temp_id),
+    KEY idx_todos_user_sync (user_id, sync_status, updated_at),
+    CONSTRAINT fk_todos_user FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT chk_todos_status CHECK (status IN ('TODO', 'DONE')),
+    CONSTRAINT chk_todos_priority CHECK (priority IN ('LOW', 'MEDIUM', 'HIGH')),
+    CONSTRAINT chk_todos_sync_status CHECK (sync_status IN ('SYNCED', 'PENDING_CREATE', 'PENDING_UPDATE', 'PENDING_DELETE', 'FAILED'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE tags (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id BIGINT UNSIGNED NOT NULL,
+    name VARCHAR(30) NOT NULL,
+    normalized_name VARCHAR(30) NOT NULL,
+    color VARCHAR(7) NOT NULL DEFAULT '#2F80ED',
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    deleted_at DATETIME(3) NULL,
+    active_key BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_tags_user_active_name (user_id, normalized_name, active_key),
+    KEY idx_tags_user_sort (user_id, deleted_at, sort_order, created_at),
+    CONSTRAINT fk_tags_user FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT chk_tags_color CHECK (color REGEXP '^#[0-9A-Fa-f]{6}$')
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE todo_tags (
+    todo_id BIGINT UNSIGNED NOT NULL,
+    tag_id BIGINT UNSIGNED NOT NULL,
+    user_id BIGINT UNSIGNED NOT NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (todo_id, tag_id),
+    KEY idx_todo_tags_user_tag (user_id, tag_id, todo_id),
+    KEY idx_todo_tags_tag (tag_id),
+    CONSTRAINT fk_todo_tags_todo FOREIGN KEY (todo_id) REFERENCES todos (id),
+    CONSTRAINT fk_todo_tags_tag FOREIGN KEY (tag_id) REFERENCES tags (id),
+    CONSTRAINT fk_todo_tags_user FOREIGN KEY (user_id) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE auth_tokens (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id BIGINT UNSIGNED NOT NULL,
+    token_hash CHAR(64) NOT NULL,
+    token_type VARCHAR(20) NOT NULL,
+    parent_token_id BIGINT UNSIGNED NULL,
+    device_name VARCHAR(120) NULL,
+    user_agent VARCHAR(500) NULL,
+    ip_address VARCHAR(45) NULL,
+    expires_at DATETIME(3) NOT NULL,
+    last_used_at DATETIME(3) NULL,
+    revoked_at DATETIME(3) NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_auth_tokens_token_hash (token_hash),
+    KEY idx_auth_tokens_user (user_id, revoked_at, expires_at),
+    KEY idx_auth_tokens_parent (parent_token_id),
+    CONSTRAINT fk_auth_tokens_user FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT fk_auth_tokens_parent FOREIGN KEY (parent_token_id) REFERENCES auth_tokens (id),
+    CONSTRAINT chk_auth_tokens_type CHECK (token_type IN ('ACCESS', 'REFRESH'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
