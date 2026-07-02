@@ -85,55 +85,6 @@ public interface TodoMapper {
             @Param("offset") int offset
     );
 
-    @Select("""
-            <script>
-            SELECT DISTINCT t.*
-            FROM todos t
-            <if test="tagId != null">
-            JOIN todo_tags tt
-              ON tt.todo_id = t.id
-             AND tt.user_id = t.user_id
-             AND tt.tag_id = #{tagId}
-            </if>
-            WHERE t.user_id = #{userId}
-              AND t.deleted_at IS NULL
-              <if test="status != null and status != ''">
-                AND t.status = #{status}
-              </if>
-              <if test="priority != null and priority != ''">
-                AND t.priority = #{priority}
-              </if>
-              <if test="keywordLike != null and keywordLike != ''">
-                AND (t.title LIKE #{keywordLike} OR t.description LIKE #{keywordLike})
-              </if>
-              <if test="dueFrom != null">
-                AND t.due_at &gt;= #{dueFrom}
-              </if>
-              <if test="dueTo != null">
-                AND t.due_at &lt;= #{dueTo}
-              </if>
-            <choose>
-              <when test="sort == 'UPDATED_DESC'">
-                ORDER BY t.updated_at DESC
-              </when>
-              <when test="sort == 'CREATED_DESC'">
-                ORDER BY t.created_at DESC
-              </when>
-              <when test="sort == 'DUE_ASC'">
-                ORDER BY CASE WHEN t.due_at IS NULL THEN 1 ELSE 0 END, t.due_at ASC, t.updated_at DESC
-              </when>
-              <otherwise>
-                ORDER BY
-                  CASE WHEN t.status = 'TODO' THEN 0 ELSE 1 END,
-                  CASE WHEN t.due_at IS NULL THEN 1 ELSE 0 END,
-                  t.due_at ASC,
-                  t.updated_at DESC
-              </otherwise>
-            </choose>
-            LIMIT #{limit}
-            OFFSET #{offset}
-            </script>
-            """)
     List<TodoEntity> searchActivePage(
             @Param("userId") Long userId,
             @Param("status") String status,
@@ -147,35 +98,6 @@ public interface TodoMapper {
             @Param("offset") int offset
     );
 
-    @Select("""
-            <script>
-            SELECT COUNT(DISTINCT t.id)
-            FROM todos t
-            <if test="tagId != null">
-            JOIN todo_tags tt
-              ON tt.todo_id = t.id
-             AND tt.user_id = t.user_id
-             AND tt.tag_id = #{tagId}
-            </if>
-            WHERE t.user_id = #{userId}
-              AND t.deleted_at IS NULL
-              <if test="status != null and status != ''">
-                AND t.status = #{status}
-              </if>
-              <if test="priority != null and priority != ''">
-                AND t.priority = #{priority}
-              </if>
-              <if test="keywordLike != null and keywordLike != ''">
-                AND (t.title LIKE #{keywordLike} OR t.description LIKE #{keywordLike})
-              </if>
-              <if test="dueFrom != null">
-                AND t.due_at &gt;= #{dueFrom}
-              </if>
-              <if test="dueTo != null">
-                AND t.due_at &lt;= #{dueTo}
-              </if>
-            </script>
-            """)
     long countSearchActive(
             @Param("userId") Long userId,
             @Param("status") String status,

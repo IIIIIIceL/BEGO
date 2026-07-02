@@ -283,6 +283,13 @@ public class TodoService {
 
     private String keywordLike(String keyword) {
         String cleanKeyword = cleanNullable(keyword);
-        return cleanKeyword == null ? null : "%" + cleanKeyword + "%";
+        return cleanKeyword == null ? null : "%" + escapeLikeKeyword(cleanKeyword) + "%";
+    }
+
+    private String escapeLikeKeyword(String keyword) {
+        return keyword
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
     }
 }

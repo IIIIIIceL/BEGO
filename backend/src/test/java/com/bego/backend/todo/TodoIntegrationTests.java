@@ -9,6 +9,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -222,6 +223,86 @@ class TodoIntegrationTests {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void searchIsUserScopedAndEscapesLikeWildcards() throws Exception {
+        AuthTokens owner = register("phase5-search-" + UUID.randomUUID() + "@example.com");
+        AuthTokens other = register("phase5-other-" + UUID.randomUUID() + "@example.com");
+        String needle = "needle-" + UUID.randomUUID();
+
+        createTodo(
+                other.accessToken(),
+                """
+                        {
+                          "title": "%s private"
+                        }
+                        """.formatted(needle)
+        );
+        createTodo(
+                owner.accessToken(),
+                """
+                        {
+                          "title": "100 percent"
+                        }
+                        """
+        );
+        createTodo(
+                owner.accessToken(),
+                """
+                        {
+                          "title": "100% literal"
+                        }
+                        """
+        );
+
+        mockMvc.perform(get("/api/v1/todos?keyword={keyword}", needle)
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(0))
+                .andExpect(jsonPath("$.items", hasSize(0)));
+
+        mockMvc.perform(get("/api/v1/todos")
+                        .param("keyword", "100%")
+                        .header("Authorization", "Bearer " + owner.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.items[0].title").value("100% literal"));
+    }
+
+    @Test
+    void combinedFiltersWorkWithPaginationAndSizeCap() throws Exception {
+        AuthTokens tokens = register("phase5-page-" + UUID.randomUUID() + "@example.com");
+        long tagId = createTag(tokens.accessToken(), "Paged");
+
+        for (int i = 0; i < 3; i++) {
+            createTodo(
+                    tokens.accessToken(),
+                    """
+                            {
+                              "title": "Paged report %d",
+                              "description": "phase five",
+                              "priority": "HIGH",
+                              "dueAt": "2026-07-0%dT10:00:00Z",
+                              "tagIds": [%d]
+                            }
+                            """.formatted(i, i + 3, tagId)
+            );
+        }
+
+        mockMvc.perform(get("/api/v1/todos?status=TODO&priority=HIGH&tagId={tagId}&keyword=report&page=1&size=2&sort=DUE_ASC", tagId)
+                        .header("Authorization", "Bearer " + tokens.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(3))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(2))
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].title").value("Paged report 2"));
+
+        mockMvc.perform(get("/api/v1/todos?size=150")
+                        .header("Authorization", "Bearer " + tokens.accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.size").value(100));
     }
 
     private AuthTokens register(String email) throws Exception {
